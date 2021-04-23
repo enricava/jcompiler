@@ -1,0 +1,7 @@
+enum dia {lunes, martes}
+casa.puerta = 3
+x[i] = 4
+int x = 3*4
+const casa c = {2,3}
+dia d = lunes
+const int j = 1

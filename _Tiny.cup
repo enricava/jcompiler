@@ -1,0 +1,93 @@
+package asint;
+
+import java_cup.runtime.*;
+import alex.AnalizadorLexicoTiny;
+import alex.UnidadLexica;
+import errors.GestionErroresTiny;
+
+scan with {: return getScanner().next_token(); :};
+parser code {: 
+   private GestionErroresTiny errores;
+   public void syntax_error(Symbol unidadLexica) {
+     errores.errorSintactico((UnidadLexica)unidadLexica);
+   }
+:};
+init with {: 
+   errores = new GestionErroresTiny();
+   AnalizadorLexicoTiny alex = (AnalizadorLexicoTiny)getScanner();
+   alex.fijaGestionErrores(errores);
+:};
+
+
+
+terminal          COMMENT, TENT, IDEN, ASIGNA, TBOOL, TCHAR, TBIN, ENT, BOOL, BIN, CHAR, CAP, CCIERRE, COMA, ARRAY, PUNTO, SIZE,
+                     MAS, MENOS, POR, DIV, MOD, PAP, PCIERRE, INCR, DECR, OR, AND, NOT, MENOR, MENORIGUAL, MAYOR, MAYORIGUAL,
+                     IGUAL, DISTINTO, STRUCT, LLAVEAP, LLAVECIERRE, DEF, RETURN, ENUM, CONSTANTE, FOR, WHILE, IF, ELIF, ELSE,
+                     READ, PRINT;
+
+non terminal      P, ListInst, Inst, Declaracion, TipoBasico, TipoArray, Valor,
+                  ValorArray, Array, DeclaraStruct, PasoFor, Struct, Campos, InstRead, InstPrint, DeclaraEnum,
+                  CampoStruct, DeclaraFunc, InstDecremento, InstIncremento, FuncionArray,
+                  ArgumentosDef, Enumerado, Enumerados, Asignacion, InstFor, InicioFor, Operacion, InstWhile, InstIf, Elses,
+                  Prioridad3, Prioridad2, Prioridad1, Prioridad0, Funcion, Argumentos, Tipo;
+
+
+
+
+P                   ::=    ListInst ;
+ListInst            ::=    Inst ListInst | COMMENT | ;
+Inst                ::=    Declaracion | Struct | DeclaraFunc | Enumerado | InstFor | InstWhile | InstIf
+                              | InstIncremento | InstDecremento | Asignacion | InstRead | InstPrint;
+
+
+Declaracion         ::=    CONSTANTE Tipo Asignacion | Tipo Asignacion | CONSTANTE DeclaraStruct | DeclaraStruct | CONSTANTE DeclaraEnum | DeclaraEnum;
+Asignacion          ::=    IDEN ASIGNA Operacion | IDEN PUNTO IDEN ASIGNA Operacion | IDEN CAP Operacion CCIERRE ASIGNA Operacion;
+Tipo                ::=    TipoBasico | TipoArray;
+TipoBasico          ::=    TENT | TBOOL | TCHAR | TBIN;
+TipoArray           ::=    ARRAY ENT TipoBasico | ARRAY ENT PAP TipoArray PCIERRE;
+DeclaraStruct       ::=    IDEN IDEN ASIGNA LLAVEAP Array LLAVECIERRE;
+DeclaraEnum         ::=    IDEN IDEN ASIGNA IDEN;
+
+Valor               ::=    ENT | BOOL | CHAR | BIN | IDEN | Funcion | CampoStruct | ValorArray | FuncionArray;
+FuncionArray        ::=    IDEN CAP Operacion CCIERRE | IDEN PUNTO SIZE;
+ValorArray          ::=    CAP Array CCIERRE | LLAVEAP Operacion LLAVECIERRE;
+Array               ::=    Operacion | Operacion COMA Array;
+
+Operacion           ::=    Operacion MAS Prioridad3 | Operacion MENOS Prioridad3 | Operacion OR Prioridad3 | Prioridad3;
+Prioridad3          ::=    Prioridad3 POR Prioridad2 | Prioridad3 DIV Prioridad2 | Prioridad3 MOD Prioridad2 | Prioridad3 AND Prioridad2 | Prioridad2;
+Prioridad2          ::=    Prioridad2 IGUAL Prioridad1 | Prioridad2 DISTINTO Prioridad1 | Prioridad1
+                              | Prioridad2 MENOR Prioridad1 | Prioridad2 MAYOR Prioridad1
+                              | Prioridad2 MENORIGUAL Prioridad1 | Prioridad2 MAYORIGUAL Prioridad1;
+Prioridad1          ::=    NOT Prioridad0 | Prioridad0 INCR | Prioridad0 DECR | Prioridad0;
+Prioridad0          ::=    PAP Operacion PCIERRE | Valor;
+
+InstIncremento      ::=    IDEN INCR;
+InstDecremento      ::=    IDEN DECR;
+
+Funcion             ::=    IDEN PAP Argumentos PCIERRE | IDEN PAP PCIERRE;
+Argumentos          ::=    Operacion | Operacion COMA Argumentos;
+
+Struct              ::=    STRUCT IDEN LLAVEAP Campos LLAVECIERRE;
+Campos              ::=    Tipo IDEN COMA Campos | Tipo IDEN;
+CampoStruct         ::=    IDEN PUNTO IDEN;
+
+DeclaraFunc         ::=    DEF Tipo IDEN PAP ArgumentosDef PCIERRE LLAVEAP ListInst RETURN Operacion LLAVECIERRE;
+ArgumentosDef       ::=    Tipo IDEN | Tipo IDEN COMA ArgumentosDef;
+
+Enumerado           ::=    ENUM IDEN LLAVEAP Enumerados LLAVECIERRE;
+Enumerados          ::=    IDEN | IDEN COMA Enumerados;
+
+InstFor             ::=    FOR PAP InicioFor COMA Operacion COMA PasoFor PCIERRE LLAVEAP ListInst LLAVECIERRE;
+InicioFor           ::=    TENT IDEN ASIGNA ENT;
+PasoFor             ::=    InstIncremento | InstDecremento | IDEN ASIGNA Operacion;
+
+InstWhile           ::=    WHILE PAP Operacion PCIERRE LLAVEAP ListInst LLAVECIERRE;
+
+InstIf              ::=    IF PAP Operacion PCIERRE LLAVEAP ListInst LLAVECIERRE
+                              | IF PAP Operacion PCIERRE LLAVEAP ListInst LLAVECIERRE Elses;
+
+Elses               ::=    ELIF PAP Operacion PCIERRE LLAVEAP ListInst LLAVECIERRE Elses
+                              | ELSE LLAVEAP ListInst LLAVECIERRE;
+
+InstRead            ::=    READ PAP IDEN PCIERRE;
+InstPrint           ::=    PRINT PAP Operacion PCIERRE;

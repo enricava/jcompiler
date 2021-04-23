@@ -1,0 +1,274 @@
+package constructorast;
+
+import java_cup.runtime.*;
+import alex.AnalizadorLexicoExp;
+import alex.UnidadLexica;
+import errors.GestionErroresExp;
+import ast.E;
+import ast.ASExp;
+
+scan with {: return getScanner().next_token(); :};
+action code {:
+   private ASExp as = new ASExp();
+:};
+parser code {: 
+   private GestionErroresExp errores;
+   public void syntax_error(Symbol unidadLexica) {
+     errores.errorSintactico((UnidadLexica)unidadLexica);
+   }
+:};
+init with {: 
+   errores = new GestionErroresExp();
+   AnalizadorLexicoExp alex = (AnalizadorLexicoExp)getScanner();
+   alex.fijaGestionErrores(errores);
+:};
+
+terminal  MAS, MENOS, POR, DIV, MOD, PAP, PCIERRE, INCR, DECR, NOT, IGUAL, OR, AND, MENOR, MENORIGUAL, MAYOR, MAYORIGUAL, DISTINTO,
+            ASIGNA, WHILE, FOR, LLAVEAP, LLAVECIERRE, IF, ELIF, ELSE, PRINT, READ, PUNTO, SIZE, COMA, CAP, STRUCT, CCIERRE,
+            TENT, TBOOL, TCHAR, TBIN, ARRAY, DEF, RETURN, ENUM, CONSTANTE;
+terminal  String ENT, IDEN, BOOL, CHAR, BIN;
+
+non terminal  E P, Operacion, Prioridad3, Prioridad2, Prioridad1, Prioridad0, ListInst, Inst, InstFor, InicioFor, PasoFor, Valor,
+               InstDecremento, InstIncremento, Asignacion, InstWhile, InstIf, Elses, InstRead, InstPrint, Funcion, Argumentos,
+               CampoStruct, ValorArray, Array, FuncionArray, Struct, Campos, Tipo, TipoArray, TipoBasico, DeclaraFunc, ArgumentosDef,
+               Enumerado, Enumerados, DeclaraStruct, DeclaraEnum, Declaracion;
+
+P  ::= ListInst: ls
+   {: RESULT=as.programa(ls); :};
+
+/* ----------------------- INSTRUCCIONES ------------------------- */
+
+
+ListInst          ::= Inst: in ListInst: ls
+   {: RESULT = as.listinst(in,ls); :};
+ListInst          ::=
+   {: RESULT = as.fin(); :};
+Inst              ::= Asignacion: asig
+   {: RESULT = asig; :};
+Inst              ::= InstFor: instfor
+   {: RESULT = instfor; :};
+Inst              ::= InstIncremento: inst
+   {: RESULT = inst; :};
+Inst              ::= InstDecremento: inst
+   {: RESULT = inst; :};
+Inst              ::= InstWhile: inst
+   {: RESULT = inst; :};   
+Inst              ::= InstIf: inst
+   {: RESULT = inst; :};
+Inst              ::= InstRead: inst
+   {: RESULT = inst; :}; 
+Inst              ::= InstPrint: inst
+   {: RESULT = inst; :}; 
+Inst              ::= Struct: inst
+   {: RESULT = inst; :}; 
+Inst              ::= DeclaraFunc: inst
+   {: RESULT = inst; :}; 
+Inst              ::= Declaracion: inst
+   {: RESULT = inst; :};
+Inst              ::= Enumerado: inst
+   {: RESULT = inst; :}; 
+  
+
+Declaracion        ::=    CONSTANTE Tipo:tipo Asignacion: asig
+   {: RESULT = as.declaraBasico(as.constante(),tipo,asig); :};
+Declaracion        ::=    Tipo:tipo Asignacion: asig
+   {: RESULT = as.declaraBasico(as.fin(),tipo,asig); :};
+Declaracion        ::=    CONSTANTE DeclaraStruct: struct
+   {: RESULT = as.declaracion(as.constante(),struct); :};
+Declaracion        ::=    DeclaraStruct: struct
+   {: RESULT = as.declaracion(as.fin(),struct); :};
+Declaracion        ::=    CONSTANTE DeclaraEnum: enumerado
+   {: RESULT = as.declaracion(as.constante(),enumerado); :};
+Declaracion        ::=    DeclaraEnum: enumerado
+   {: RESULT = as.declaracion(as.fin(),enumerado); :};
+
+
+Asignacion        ::= IDEN: var ASIGNA Operacion: op
+   {: RESULT = as.asigna(as.iden(var),op); :};
+Asignacion        ::= IDEN:var PUNTO IDEN:campo ASIGNA Operacion:op
+   {: RESULT = as.asignaStruct(as.iden(var),as.iden(campo),op); :};
+Asignacion        ::= IDEN:array CAP Operacion:pos CCIERRE ASIGNA Operacion: valor
+   {: RESULT = as.asignaArray(as.iden(array),pos,valor); :};
+
+Enumerado         ::=    ENUM IDEN:nombre LLAVEAP Enumerados:datos LLAVECIERRE
+   {: RESULT = as.enumerado(as.iden(nombre),datos); :};
+Enumerados        ::=    IDEN: dato 
+   {: RESULT = as.enumerados(as.iden(dato),as.fin()); :};
+Enumerados        ::=    IDEN:dato COMA Enumerados:datos
+   {: RESULT = as.enumerados(as.iden(dato),datos); :};
+
+DeclaraFunc       ::=    DEF Tipo: tipo IDEN: nombre PAP ArgumentosDef:args PCIERRE LLAVEAP ListInst:cuerpo RETURN Operacion:op LLAVECIERRE
+   {: RESULT = as.declaraFunc(tipo, as.iden(nombre), args, cuerpo, op); :};
+
+ArgumentosDef     ::=    Tipo: tipo IDEN: var
+   {: RESULT = as.argumentosDef(tipo, as.iden(var), as.fin()); :};
+
+ArgumentosDef     ::=    Tipo: tipo IDEN: var COMA ArgumentosDef:args
+   {: RESULT = as.argumentosDef(tipo,as.iden(var), args); :};
+   
+DeclaraStruct       ::=    IDEN:struct IDEN:var ASIGNA LLAVEAP Array:valores LLAVECIERRE
+   {: RESULT = as.declaraStruct(as.iden(struct),as.iden(var), valores); :};
+
+DeclaraEnum         ::=    IDEN:enumerado IDEN: var ASIGNA IDEN: valor
+   {: RESULT = as.declaraEnum(as.iden(enumerado),as.iden(var), as.iden(valor)); :};
+
+Struct            ::=    STRUCT IDEN:lexDeIden LLAVEAP Campos: cps LLAVECIERRE
+   {: RESULT = as.struct(as.iden(lexDeIden), cps); :};
+Campos            ::=    Tipo: tipo IDEN:lexDeIden COMA Campos:cps
+   {: RESULT = as.campos(tipo, as.iden(lexDeIden),cps); :};
+Campos            ::=    Tipo:tipo IDEN: lexDeIden
+   {: RESULT = as.campos(tipo,as.iden(lexDeIden),as.fin()); :};
+
+InstIncremento    ::=    IDEN: var INCR
+   {: RESULT = as.incr(as.iden(var)); :};
+InstDecremento    ::=    IDEN: var DECR
+   {: RESULT = as.decr(as.iden(var)); :};
+InstFor           ::=    FOR PAP InicioFor: f1 COMA 
+                           Operacion: f2 COMA
+                           PasoFor:f3 PCIERRE LLAVEAP ListInst: cuerpo LLAVECIERRE
+   {: RESULT = as.instFor(f1,f2,f3,cuerpo); :};
+InicioFor         ::=    TENT IDEN: var ASIGNA Operacion: op
+   {: RESULT = as.inicioFor(as.iden(var),op); :};
+PasoFor           ::=    InstIncremento: inst
+   {: RESULT = inst; :};
+PasoFor           ::=    InstDecremento: inst
+   {: RESULT = inst; :};
+PasoFor           ::=    IDEN: var ASIGNA Operacion: op
+   {: RESULT = as.asigna(as.iden(var),op); :};
+
+InstWhile         ::=    WHILE PAP Operacion:op PCIERRE LLAVEAP ListInst: listinst LLAVECIERRE
+   {: RESULT = as.instWhile(op,listinst); :};
+
+InstIf             ::=    IF PAP Operacion:op PCIERRE LLAVEAP ListInst:listinst LLAVECIERRE
+   {: RESULT = as.instIf(op,listinst,as.fin()); :};
+InstIf             ::=    IF PAP Operacion:op PCIERRE LLAVEAP ListInst:listinst LLAVECIERRE Elses: elses
+   {: RESULT = as.instIf(op,listinst,elses); :};
+Elses               ::=    ELIF PAP Operacion:op PCIERRE LLAVEAP ListInst:listinst LLAVECIERRE Elses: elses
+   {: RESULT = as.instElif(op,listinst,elses); :};
+Elses               ::=    ELSE LLAVEAP ListInst:listinst LLAVECIERRE
+   {: RESULT = as.instElse(listinst); :};
+
+InstRead            ::=    READ PAP IDEN: var PCIERRE
+   {: RESULT = as.instRead(as.iden(var)); :};
+InstPrint           ::=    PRINT PAP IDEN: var PCIERRE
+   {: RESULT = as.instPrint(as.iden(var)); :};
+
+/* ------------------------- OPERACIONES ------------------------- */
+
+Valor             ::=    ENT: lexDeEnt           
+   {: RESULT = as.ent(lexDeEnt); :};
+Valor             ::=    BOOL: lexDeBool           
+   {: RESULT = as.bool(lexDeBool); :};
+Valor             ::=    CHAR: lexDeChar           
+   {: RESULT = as.caracter(lexDeChar); :};
+Valor             ::=    BIN: lexDeBin           
+   {: RESULT = as.bin(lexDeBin); :};
+Valor             ::=    IDEN: lexDeIden           
+   {: RESULT = as.iden(lexDeIden); :};
+Valor             ::=    Funcion: f           
+   {: RESULT = f; :};
+Valor             ::=    CampoStruct: st
+   {: RESULT = st; :};
+Valor             ::=    ValorArray: array
+   {: RESULT = array; :};  
+Valor             ::=    FuncionArray: farray
+   {: RESULT = farray; :};  
+
+
+ValorArray        ::=    CAP Array:array CCIERRE
+   {: RESULT = as.coleccion(array); :};
+ValorArray        ::=    LLAVEAP Operacion:op LLAVECIERRE
+   {: RESULT = as.array(op); :};
+Array             ::=    Operacion:op
+   {: RESULT = op; :};
+Array             ::=    Operacion:op COMA Array: array
+   {: RESULT = as.customArray(op,array); :};
+
+FuncionArray      ::=    IDEN: lexDeIden CAP Operacion: pos CCIERRE 
+   {: RESULT = as.accesoArray(as.iden(lexDeIden),pos); :};
+FuncionArray      ::= IDEN:lexDeIden PUNTO SIZE
+   {: RESULT = as.tamArray(as.iden(lexDeIden)); :};
+
+
+CampoStruct       ::=    IDEN: lexDeIden PUNTO IDEN: lexDeCampo
+   {: RESULT = as.campostruct(as.iden(lexDeIden),as.iden(lexDeCampo)); :};
+
+Funcion           ::=    IDEN: lexDeIden PAP Argumentos: args PCIERRE
+   {: RESULT = as.funcion(as.iden(lexDeIden),args); :};
+Funcion           ::=    IDEN: lexDeIden PAP PCIERRE
+   {: RESULT = as.funcion(as.iden(lexDeIden), as.fin()); :};
+Argumentos        ::=    Operacion: op
+   {: RESULT = op; :};
+Argumentos        ::=    Operacion: op COMA Argumentos: args
+   {: RESULT = as.args(op,args); :};
+
+Operacion         ::= Operacion: op MAS Prioridad3: p3 
+   {: RESULT=as.suma(op,p3); :};
+Operacion         ::= Operacion: op MENOS Prioridad3: p3 
+   {: RESULT=as.resta(op,p3); :};
+Operacion         ::= Operacion: op OR Prioridad3: p3 
+   {: RESULT=as.or(op,p3); :};
+Operacion         ::= Prioridad3: p3
+   {: RESULT=p3; :};
+
+Prioridad3        ::= Prioridad3: p3 POR Prioridad2: p2 
+   {: RESULT=as.mul(p3,p2); :};
+Prioridad3        ::= Prioridad3: p3 DIV Prioridad2: p2 
+   {: RESULT=as.div(p3,p2); :};
+Prioridad3        ::= Prioridad3: p3 MOD Prioridad2: p2 
+   {: RESULT=as.mod(p3,p2); :};
+Prioridad3        ::= Prioridad3: p3 AND Prioridad2: p2 
+   {: RESULT=as.and(p3,p2); :};
+Prioridad3        ::= Prioridad2: p2
+   {: RESULT=p2; :};
+
+Prioridad2        ::= Prioridad2: p2 IGUAL Prioridad1: p1 
+   {: RESULT=as.igual(p2,p1); :};
+Prioridad2        ::= Prioridad2: p2 DISTINTO Prioridad1: p1 
+   {: RESULT=as.distinto(p2,p1); :};
+Prioridad2        ::= Prioridad2: p2 MAYOR Prioridad1: p1 
+   {: RESULT=as.mayor(p2,p1); :};
+Prioridad2        ::= Prioridad2: p2 MENOR Prioridad1: p1 
+   {: RESULT=as.menor(p2,p1); :};
+Prioridad2        ::= Prioridad2: p2 MAYORIGUAL Prioridad1: p1 
+   {: RESULT=as.mayorIgual(p2,p1); :};
+Prioridad2        ::= Prioridad2: p2 MENORIGUAL Prioridad1: p1 
+   {: RESULT=as.menorIgual(p2,p1); :};
+Prioridad2        ::= Prioridad1: p1
+   {: RESULT=p1; :};
+
+Prioridad1        ::= Prioridad0: p0 INCR 
+   {: RESULT=as.incr(p0); :};
+Prioridad1        ::= Prioridad0: p0 DECR 
+   {: RESULT=as.decr(p0); :};
+Prioridad1        ::= NOT Prioridad0: p0  
+   {: RESULT=as.not(p0); :};
+Prioridad1        ::= Prioridad0: p0
+   {: RESULT=p0; :}; 
+    
+Prioridad0        ::= Valor: v           
+   {: RESULT = v; :};
+Prioridad0        ::= PAP Operacion: op PCIERRE
+   {: RESULT = op; :};
+
+/* ----------------------- TIPOS ------------------------- */
+
+Tipo              ::=    TipoBasico: t
+   {: RESULT = t; :};
+Tipo              ::=    TipoArray: t
+   {: RESULT =t; :};
+
+TipoBasico        ::=    TENT
+   {: RESULT = as.tent(); :};
+TipoBasico        ::=    TCHAR
+   {: RESULT = as.tchar(); :};
+TipoBasico        ::=    TBIN
+   {: RESULT = as.tbin(); :};
+TipoBasico        ::=    TBOOL
+   {: RESULT = as.tbool(); :};
+
+TipoArray         ::=    ARRAY ENT: tam TipoBasico: t
+     {: RESULT = as.tarray(as.ent(tam), t); :};
+TipoArray         ::=    ARRAY ENT: tam PAP TipoArray:t PCIERRE
+     {: RESULT = as.tarray(as.ent(tam), t); :};
+
